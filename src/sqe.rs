@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use super::IoUring;
 
-use libc::{msghdr, sockaddr, socklen_t};
+use libc::{msghdr, sockaddr, socklen_t, c_void, c_int};
 
 pub struct SubmissionQueue<'ring> {
     ring: NonNull<uring_sys::io_uring>,
@@ -182,55 +182,27 @@ impl<'a> SubmissionQueueEvent<'a> {
 
     #[inline]
     pub unsafe fn prep_poll_add(&mut self, fd: RawFd, poll_mask: PollMask) {
-        self.sqe.opcode = uring_sys::IORING_OP_POLL_ADD;
-        self.sqe.flags = 0;
-        self.sqe.ioprio = 0;
-        self.sqe.fd = fd;
-        self.sqe.off_addr2.off = 0;
-        self.sqe.addr = 0;
-        self.sqe.len = 0;
-        self.sqe.cmd_flags.poll_events = poll_mask.bits();
+        uring_sys::io_uring_prep_poll_add(self.sqe, fd, poll_mask.bits());
     }
 
     #[inline]
-    pub unsafe fn prep_poll_remove(&mut self, user_data: *const ()) {
-        *self.sqe = std::mem::zeroed();
-
-        self.sqe.opcode = IORING_OP_POLL_REMOVE;
-        self.sqe.fd = -1;
-        self.sqe.addr = user_data as _;
+    pub unsafe fn prep_poll_remove(&mut self, user_data: *mut c_void) {
+        uring_sys::io_uring_prep_poll_remove(self.sqe, user_data);
     }
 
     #[inline]
-    pub unsafe fn prep_recvmsg(&mut self, fd: RawFd, msg: *const msghdr, flags: RecvmsgFlags) {
-        *self.sqe = mem::zeroed();
-
-        self.sqe.opcode = IORING_OP_RECVMSG;
-        self.sqe.fd = fd;
-        self.sqe.addr = msg as _;
-        self.sqe.len = 1;
-        self.sqe.cmd_flags.msg_flags = flags.bits();
+    pub unsafe fn prep_recvmsg(&mut self, fd: RawFd, msg: &mut msghdr, flags: RecvmsgFlags) {
+        uring_sys::io_uring_prep_recvmsg(self.sqe, fd, msg, flags.bits());
     }
 
     #[inline]
-    pub unsafe fn prep_sendmsg(&mut self, fd: RawFd, msg: *const msghdr, flags: SendmsgFlags) {
-        *self.sqe = std::mem::zeroed();
-
-        self.sqe.opcode = IORING_OP_SENDMSG;
-        self.sqe.fd = fd;
-        self.sqe.addr = msg as _;
-        self.sqe.len = 1;
-        self.sqe.cmd_flags.msg_flags = flags.bits();
+    pub unsafe fn prep_sendmsg(&mut self, fd: RawFd, msg: &msghdr, flags: SendmsgFlags) {
+        uring_sys::io_uring_prep_sendmsg(self.sqe, fd, msg, flags.bits());
     }
 
     #[inline]
     pub unsafe fn prep_timeout_remove(&mut self, user_data: u64, flags: TimeoutFlags) {
-        *self.sqe = mem::zeroed();
-
-        self.sqe.opcode = IORING_OP_TIMEOUT_REMOVE;
-        self.sqe.fd = -1;
-        self.sqe.addr = user_data;
-        self.sqe.cmd_flags.timeout_flags = flags.bits();
+        uring_sys::io_uring_prep_timeout_remove(self.sqe, user_data, flags.bits());
     }
 
     /// Corresponds to the `accept` (or `accept4`) syscall.
@@ -238,38 +210,23 @@ impl<'a> SubmissionQueueEvent<'a> {
     pub unsafe fn prep_accept(
         &mut self,
         fd: RawFd,
-        addr: &sockaddr,
-        addrlen: &socklen_t,
+        addr: &mut sockaddr,
+        addrlen: &mut socklen_t,
         flags: AcceptFlags,
     ) {
-        *self.sqe = mem::zeroed();
-
-        self.sqe.opcode = IORING_OP_ACCEPT;
-        self.sqe.fd = fd;
-        self.sqe.addr = addr as *const sockaddr as _;
-        self.sqe.len = addrlen as *const socklen_t as _;
-        self.sqe.cmd_flags.accept_flags = flags.bits();
+        uring_sys::io_uring_prep_accept(self.sqe, fd, addr, addrlen, flags.bits());
     }
 
     #[inline]
-    pub unsafe fn prep_cancel(&mut self, user_data: *const (), flags: u32) {
-        *self.sqe = mem::zeroed();
-
-        self.sqe.opcode = IORING_OP_ASYNC_CANCEL;
-        self.sqe.fd = -1;
-        self.sqe.addr = user_data as _;
-        self.sqe.cmd_flags.cancel_flags = flags;
+    pub unsafe fn prep_cancel(&mut self, user_data: *mut c_void, flags: c_int) {
+        uring_sys::io_uring_prep_cancel(self.sqe, user_data, flags);
     }
 
     #[inline]
-    pub unsafe fn prep_link_timeout(&mut self, ts: &sys::__kernel_timespec, flags: TimeoutFlags) {
-        *self.sqe = mem::zeroed();
-
-        self.sqe.opcode = IORING_OP_LINK_TIMEOUT;
-        self.sqe.fd = -1;
-        self.sqe.addr = ts as *const sys::__kernel_timespec as _;
-        self.sqe.len = 1;
-        self.sqe.cmd_flags.timeout_flags = flags.bits();
+    pub unsafe fn prep_link_timeout(&mut self, ts: &uring_sys::__kernel_timespec, flags: TimeoutFlags) {
+        uring_sys::io_uring_prep_link_timeout(self.sqe, 
+                                        ts as *const _ as *mut _,
+                                        flags.bits());
     }
 
     pub fn clear(&mut self) {
@@ -309,7 +266,7 @@ bitflags::bitflags! {
 }
 
 bitflags::bitflags! {
-    pub struct AcceptFlags: u32 {
+    pub struct AcceptFlags: i32 {
         const NONBLOCK  = libc::SOCK_NONBLOCK as _;
         const CLOEXEC   = libc::SOCK_CLOEXEC as _;
     }
@@ -340,7 +297,7 @@ bitflags::bitflags! {
 }
 
 bitflags::bitflags! {
-    pub struct PollMask: u16 {
+    pub struct PollMask: i16 {
         const IN        = libc::EPOLLIN as _;
         const OUT       = libc::EPOLLOUT as _;
         const RDHUP     = libc::EPOLLRDHUP as _;
