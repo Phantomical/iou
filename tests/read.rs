@@ -3,8 +3,8 @@ extern crate test;
 
 use std::fs::File;
 use std::io;
-use std::path::PathBuf;
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::path::PathBuf;
 
 const TEXT: &[u8] = b"I really wanna stop
 But I just gotta taste for it

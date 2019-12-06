@@ -1,7 +1,7 @@
 use std::fs::{self, File};
 use std::io::{self, Read};
-use std::path::PathBuf;
 use std::os::unix::io::AsRawFd;
+use std::path::PathBuf;
 
 const TEXT: &[u8] = b"I really wanna stop
 But I just gotta taste for it
@@ -50,4 +50,3 @@ fn write_test() -> io::Result<()> {
 
     Ok(())
 }
-

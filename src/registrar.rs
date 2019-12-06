@@ -1,7 +1,7 @@
 use std::io;
 use std::marker::PhantomData;
-use std::ptr::NonNull;
 use std::os::unix::io::RawFd;
+use std::ptr::NonNull;
 
 use super::IoUring;
 
@@ -64,5 +64,5 @@ impl<'ring> Registrar<'ring> {
     }
 }
 
-unsafe impl<'ring> Send for Registrar<'ring> { }
-unsafe impl<'ring> Sync for Registrar<'ring> { }
+unsafe impl<'ring> Send for Registrar<'ring> {}
+unsafe impl<'ring> Sync for Registrar<'ring> {}

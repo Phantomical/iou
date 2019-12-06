@@ -4,6 +4,7 @@ use std::mem::MaybeUninit;
 use std::ptr::{self, NonNull};
 
 use super::IoUring;
+use sigset::SigSet;
 
 pub struct CompletionQueue<'ring> {
     ring: NonNull<uring_sys::io_uring>,
@@ -23,7 +24,10 @@ impl<'ring> CompletionQueue<'ring> {
             let mut cqe = MaybeUninit::uninit();
             let count = uring_sys::io_uring_peek_batch_cqe(self.ring.as_ptr(), cqe.as_mut_ptr(), 1);
             if count > 0 {
-                Some(CompletionQueueEvent::new(self.ring, &mut *cqe.assume_init()))
+                Some(CompletionQueueEvent::new(
+                    self.ring,
+                    &mut *cqe.assume_init(),
+                ))
             } else {
                 None
             }
@@ -46,13 +50,39 @@ impl<'ring> CompletionQueue<'ring> {
                 ptr::null(),
             ))?;
 
-            Ok(CompletionQueueEvent::new(self.ring, &mut *cqe.assume_init()))
+            Ok(CompletionQueueEvent::new(
+                self.ring,
+                &mut *cqe.assume_init(),
+            ))
+        }
+    }
+
+    pub fn wait_masked(
+        &mut self,
+        count: usize,
+        sigset: &mut SigSet,
+    ) -> io::Result<CompletionQueueEvent<'_>> {
+        unsafe {
+            let mut cqe = MaybeUninit::uninit();
+
+            let _: i32 = resultify!(sys::io_uring_wait_cqes(
+                self.ring.as_ptr(),
+                cqe.as_mut_ptr(),
+                count as _,
+                ptr::null(),
+                sigset.as_mut_ptr()
+            ))?;
+
+            Ok(CompletionQueueEvent::new(
+                self.ring,
+                &mut *cqe.assume_init(),
+            ))
         }
     }
 }
 
-unsafe impl<'ring> Send for CompletionQueue<'ring> { }
-unsafe impl<'ring> Sync for CompletionQueue<'ring> { }
+unsafe impl<'ring> Send for CompletionQueue<'ring> {}
+unsafe impl<'ring> Sync for CompletionQueue<'ring> {}
 
 pub struct CompletionQueueEvent<'a> {
     ring: NonNull<uring_sys::io_uring>,
@@ -60,7 +90,10 @@ pub struct CompletionQueueEvent<'a> {
 }
 
 impl<'a> CompletionQueueEvent<'a> {
-    pub(crate) fn new(ring: NonNull<uring_sys::io_uring>, cqe: &'a mut uring_sys::io_uring_cqe) -> CompletionQueueEvent<'a> {
+    pub(crate) fn new(
+        ring: NonNull<sys::io_uring>,
+        cqe: &'a mut sys::io_uring_cqe,
+    ) -> CompletionQueueEvent<'a> {
         CompletionQueueEvent { ring, cqe }
     }
 
@@ -93,5 +126,5 @@ impl<'a> Drop for CompletionQueueEvent<'a> {
     }
 }
 
-unsafe impl<'a> Send for CompletionQueueEvent<'a> { }
-unsafe impl<'a> Sync for CompletionQueueEvent<'a> { }
+unsafe impl<'a> Send for CompletionQueueEvent<'a> {}
+unsafe impl<'a> Sync for CompletionQueueEvent<'a> {}
