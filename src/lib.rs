@@ -238,7 +238,7 @@ impl IoUring {
         &mut self,
         duration: Duration,
     ) -> io::Result<CompletionQueueEvent<'_>> {
-        let ts = sys::__kernel_timespec {
+        let ts = uring_sys::__kernel_timespec {
             tv_sec: duration.as_secs() as _,
             tv_nsec: duration.subsec_nanos() as _,
         };
@@ -255,7 +255,7 @@ impl IoUring {
         count: usize,
         duration: Duration,
     ) -> io::Result<CompletionQueueEvent<'_>> {
-        let ts = sys::__kernel_timespec {
+        let ts = uring_sys::__kernel_timespec {
             tv_sec: duration.as_secs() as _,
             tv_nsec: duration.subsec_nanos() as _,
         };
@@ -266,7 +266,7 @@ impl IoUring {
     fn inner_wait_for_cqes(
         &mut self,
         count: u32,
-        ts: *const sys::__kernel_timespec,
+        ts: *const uring_sys::__kernel_timespec,
     ) -> io::Result<CompletionQueueEvent<'_>> {
         unsafe {
             let mut cqe = MaybeUninit::uninit();

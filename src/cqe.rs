@@ -65,7 +65,7 @@ impl<'ring> CompletionQueue<'ring> {
         unsafe {
             let mut cqe = MaybeUninit::uninit();
 
-            let _: i32 = resultify!(sys::io_uring_wait_cqes(
+            let _: i32 = resultify!(uring_sys::io_uring_wait_cqes(
                 self.ring.as_ptr(),
                 cqe.as_mut_ptr(),
                 count as _,
@@ -91,8 +91,8 @@ pub struct CompletionQueueEvent<'a> {
 
 impl<'a> CompletionQueueEvent<'a> {
     pub(crate) fn new(
-        ring: NonNull<sys::io_uring>,
-        cqe: &'a mut sys::io_uring_cqe,
+        ring: NonNull<uring_sys::io_uring>,
+        cqe: &'a mut uring_sys::io_uring_cqe,
     ) -> CompletionQueueEvent<'a> {
         CompletionQueueEvent { ring, cqe }
     }
