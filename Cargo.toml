@@ -12,4 +12,4 @@ edition = "2018"
 bitflags = "1.2.0"
 uring-sys = "1.0.0-beta"
 libc = "0.2"
-sigset = { path="../sigset" }
+sigset = { git="https://github.com/phantomical/sigset-rs" }
